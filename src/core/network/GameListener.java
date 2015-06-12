@@ -12,7 +12,7 @@ import core.Game;
 import core.State;
 import utils.Validate;
 
-public class GameListener<A extends Action, S extends State<A>, G extends Game<A, S>> implements Runnable
+public class GameListener<A extends Action, S extends State<A>, G extends Game<A, S>>
 {
     private static final Logger LOG = LoggerFactory.getLogger(GameListener.class);
     
@@ -32,22 +32,22 @@ public class GameListener<A extends Action, S extends State<A>, G extends Game<A
     {
         return null;
     }
-
-    @Override
-    public void run()
+    
+    public void connect() throws IOException
     {
-        try
-        {
+        try {
             final Socket socket = serverSocket_.accept();
             
-
-            // TODO: Loop + read json + do other stuff
-
-        }
-        catch(IOException e)
-        {
+            // TODO
+        } catch(IOException e) {
             LOG.error("Caught unexpeced exception while listening on port {}",
                     serverSocket_.getLocalPort(), e);
+            throw e;
         }
+    }
+    
+    public int getPort()
+    {
+        return serverSocket_.getLocalPort();
     }
 }
