@@ -2,8 +2,6 @@ package core.network;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -15,6 +13,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -43,10 +43,9 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
     private final AtomicInteger failedClientConnections_ = new AtomicInteger(0);
 
     /**
-     * Creates a server for an arbitrary number of clients, each specified by
-     * the port that this server should listen on.
+     * Creates a game server for the specified game
      * 
-     * @param ports
+     * @param game
      * @throws IOException
      */
     public GameServer(final G game) throws IOException
@@ -59,7 +58,7 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
         Validate.isTrue(players.size() <= MAX_PORTS,
                 "Cannot create a GameServer with more clients than ports available!");
 
-        playersToListeners_ = new HashMap<Player, GameListener<A, S, G>>(players.size());
+        playersToListeners_ = Maps.newHashMapWithExpectedSize(players.size());
 
         initializeListenersFromGame();
 
@@ -86,11 +85,14 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
     private void initializeListenersFromGame() throws IOException
     {
         final Collection<Player> players = game_.getPlayers();
-        final Set<Integer> usedPorts = new HashSet<Integer>(players.size());
+        final Set<Integer> usedPorts = Sets.newHashSetWithExpectedSize(players.size());
         for(final Player player : players)
         {
             Validate.notNull(player, "Cannot create a GameServer for a game that has a null player");
-
+            /*
+             * Doesn't really matter what port the're on, so just pick one
+             * randomly (but make sure we haven't picked it before)
+             */
             int port;
             do
             {
@@ -142,9 +144,9 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
      * 
      * @throws InterruptedException
      */
-    public void awaitAllClientConnections() throws InterruptedException
+    public boolean awaitAllClientConnections() throws InterruptedException
     {
-        final long pollTimeMilliseconds = 500;
+        final long pollTimeMilliseconds = 100;
         while(true)
         {
             if(areAllClientsConnected() || hasAClientConnectionFailed())
@@ -153,6 +155,8 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
             }
             Thread.sleep(pollTimeMilliseconds);
         }
+
+        return !(hasAClientConnectionFailed());
     }
 
     public boolean hasAClientConnectionFailed()
