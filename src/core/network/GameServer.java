@@ -1,7 +1,6 @@
 package core.network;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -40,7 +38,6 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
 
     private final ListeningExecutorService threadPool_ = MoreExecutors.listeningDecorator(Executors
             .newWorkStealingPool());
-    private final Collection<Future<Void>> waitingConnections_;
 
     private final AtomicInteger succesfulClientConnections_ = new AtomicInteger(0);
     private final AtomicInteger failedClientConnections_ = new AtomicInteger(0);
@@ -63,7 +60,6 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
                 "Cannot create a GameServer with more clients than ports available!");
 
         playersToListeners_ = new HashMap<Player, GameListener<A, S, G>>(players.size());
-        waitingConnections_ = new ArrayList<Future<Void>>(players.size());
 
         initializeListenersFromGame();
 
@@ -115,30 +111,30 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
                             listener.connect();
                             return null;
                         }
-
                     });
-
-            Futures.addCallback(waitingConnection, new FutureCallback<Void>()
-            {
-                @Override
-                public void onFailure(Throwable exception)
-                {
-                    final int totalFailures = failedClientConnections_.incrementAndGet();
-                    LOG.error("A client failed to connect, {} total failures", totalFailures,
-                            exception);
-
-                }
-
-                @Override
-                public void onSuccess(Void arg0)
-                {
-                    final int totalConnections = succesfulClientConnections_.incrementAndGet();
-                    LOG.info("A client connected, {} total connections", totalConnections);
-                }
-            });
-
-            waitingConnections_.add(waitingConnection);
+            addClientConnectionCallback(waitingConnection);
         }
+    }
+
+    private void addClientConnectionCallback(final ListenableFuture<Void> connection)
+    {
+        Futures.addCallback(connection, new FutureCallback<Void>()
+        {
+            @Override
+            public void onFailure(Throwable exception)
+            {
+                final int totalFailures = failedClientConnections_.incrementAndGet();
+                LOG.error("A client failed to connect, {} total failures", totalFailures, exception);
+
+            }
+
+            @Override
+            public void onSuccess(Void arg0)
+            {
+                final int totalConnections = succesfulClientConnections_.incrementAndGet();
+                LOG.info("A client connected, {} total connections", totalConnections);
+            }
+        });
     }
 
     /**
@@ -151,7 +147,7 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
         final long pollTimeMilliseconds = 500;
         while(true)
         {
-            if(hasAClientConnectionFailed() || areAllClientsConnected())
+            if(areAllClientsConnected() || hasAClientConnectionFailed())
             {
                 break;
             }
