@@ -1,0 +1,7 @@
+
+# Normal java stuff
+.classpath
+
+# Eclipse stuff
+eclipse-bin/*
+.settings/*
