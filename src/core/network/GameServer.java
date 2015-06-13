@@ -114,11 +114,11 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
                             return null;
                         }
                     });
-            addClientConnectionCallback(waitingConnection);
+            attachClientConnectionCallback(waitingConnection);
         }
     }
 
-    private void addClientConnectionCallback(final ListenableFuture<Void> connection)
+    private void attachClientConnectionCallback(final ListenableFuture<Void> connection)
     {
         Futures.addCallback(connection, new FutureCallback<Void>()
         {
@@ -131,7 +131,7 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
             }
 
             @Override
-            public void onSuccess(Void arg0)
+            public void onSuccess(Void success)
             {
                 final int totalConnections = succesfulClientConnections_.incrementAndGet();
                 LOG.info("A client connected, {} total connections", totalConnections);

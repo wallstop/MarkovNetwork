@@ -8,3 +8,5 @@ eclipse-bin/*
 
 # Maven
 target/*
+/bin/
+/target/
