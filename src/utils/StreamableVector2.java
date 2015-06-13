@@ -10,7 +10,7 @@ public final class StreamableVector2
     @JsonProperty("y")
     private int y_;
 
-    private StreamableVector2(final Vector2 vector)
+    StreamableVector2(final Vector2 vector)
     {
         x_ = vector.getX();
         y_ = vector.getY();

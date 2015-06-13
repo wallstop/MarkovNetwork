@@ -25,7 +25,7 @@ public class StreamableBoard
     @JsonProperty("board")
     private Map<StreamableVector2, TicTacToeMark> board_;
 
-    private StreamableBoard(final TicTacToeBoard board)
+    StreamableBoard(final TicTacToeBoard board)
     {
         board_ = board
                 .getBoardAsMap()
@@ -70,7 +70,7 @@ public class StreamableBoard
         return new StreamableBoard(board);
     }
 
-    public static TicTacToeBoard fromStreamableBoard(final StreamableBoard board)
+    public static TicTacToeBoard toTicTacToeBoard(final StreamableBoard board)
     {
         Validate.notNull(board, "Cannot create a TicTacToeBoard from a null StreamableBoard!");
         return new TicTacToeBoard(board.getWidth(), board.getHeight(),

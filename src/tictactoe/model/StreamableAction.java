@@ -16,7 +16,7 @@ public class StreamableAction
     @JsonProperty("Mark")
     private TicTacToeMark mark_;
 
-    private StreamableAction(final TicTacToeAction action)
+    StreamableAction(final TicTacToeAction action)
     {
         final StreamableVector2 position = StreamableVector2.fromVector2(action.getPosition());
         position_ = position;
