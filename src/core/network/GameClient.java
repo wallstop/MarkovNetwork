@@ -11,8 +11,6 @@ import java.util.Collection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.reflect.TypeToken;
-
 import utils.SerializationUtils;
 import utils.Validate;
 import core.Player;

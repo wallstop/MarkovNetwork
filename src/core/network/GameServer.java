@@ -157,7 +157,7 @@ public class GameServer<S, A, R extends Rules<S, A>>
      * 
      * @throws InterruptedException
      * 
-     * @return True if all clients have connected succesfully, false otherwise
+     * @return True if all clients have connected successfully, false otherwise
      */
     public boolean awaitAllClientConnections() throws InterruptedException
     {
@@ -170,8 +170,9 @@ public class GameServer<S, A, R extends Rules<S, A>>
             }
             Thread.sleep(pollTimeMilliseconds);
         }
-        
-        LOG.info(hasAClientConnectionFailed() ? "A client had a problem connecting" : "All clients connected successfully");
+
+        LOG.info(hasAClientConnectionFailed() ? "A client had a problem connecting"
+                : "All clients connected successfully");
 
         return !(hasAClientConnectionFailed());
     }
