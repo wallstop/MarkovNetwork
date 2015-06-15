@@ -21,20 +21,18 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
+import utils.Range;
 import utils.Validate;
-import core.Action;
-import core.Game;
 import core.Player;
-import core.State;
+import core.Rules;
 
-public class GameServer<A extends Action, S extends State<A>, G extends Game<A, S>>
+public class GameServer<S, A, R extends Rules<S, A>>
 {
     private static final Logger LOG = LoggerFactory.getLogger(GameServer.class);
 
-    private final G game_;
-    private final Map<Player, GameListener<A, S, G>> playersToListeners_;
+    private final Map<Player, GameListener<S, A>> playersToListeners_;
 
-    private static final int MAX_PORTS = 2 >> 16;
+    private static final int MAX_PORTS = (1 << 16);
 
     private final ListeningExecutorService threadPool_ = MoreExecutors.listeningDecorator(Executors
             .newWorkStealingPool());
@@ -48,19 +46,25 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
      * @param game
      * @throws IOException
      */
-    public GameServer(final G game) throws IOException
+    public GameServer(final R rules, final Collection<Player> players, final Class<A> actionClass)
     {
-        Validate.notNull(game, "Cannot create a GameServer with a null game");
-        game_ = game;
+        Validate.notNull(rules, "Cannot create a GameServer with a null Ruleset");
+        final Range<Integer> playerRange = rules.numberOfPlayers();
+        Validate.notNull(playerRange, "Cannot create a GameServer for a null player range");
+        Validate.notEmpty(players, "Cannot create a GameServer with a null Collection of Players");
+        final int numPlayers = players.size();
+        Validate.isTrue(playerRange.isValueWithin(numPlayers), String.format(
+                "Cannot create a game for %d players; %d is not within %s", numPlayers, numPlayers,
+                playerRange));
 
-        final Collection<Player> players = game.getPlayers();
-        Validate.notEmpty(players, "Cannot create a GameServer with a null/empty Player set");
-        Validate.isTrue(players.size() <= MAX_PORTS,
-                "Cannot create a GameServer with more clients than ports available!");
+        Validate.isTrue(numPlayers <= MAX_PORTS,
+                String.format("Cannot create a GameServer with more clients "
+                        + "(%d) than ports available (%d)!", numPlayers, MAX_PORTS));
+        Validate.notNull(actionClass, "Cannot create a GameServer with a null actionClass");
 
-        playersToListeners_ = Maps.newHashMapWithExpectedSize(players.size());
+        playersToListeners_ = Maps.newHashMapWithExpectedSize(numPlayers);
 
-        initializeListenersFromGame();
+        initializeListenersFromPlayers(players, actionClass);
 
         /*
          * Not sure of the best way to properly set up clients & severs
@@ -77,44 +81,54 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
     }
 
     /*
-     * Should only ever be called from Constructor. This is a bundled init
+     * This should only ever be called from Constructor. This is a bundled init
      * method; it constructs all GameListeners, maps Players to those listeners,
      * and also spawns threads to await on socket connections for those
      * listeners
      */
-    private void initializeListenersFromGame() throws IOException
+    private void initializeListenersFromPlayers(final Collection<Player> players,
+            final Class<A> actionClass)
     {
-        final Collection<Player> players = game_.getPlayers();
         final Set<Integer> usedPorts = Sets.newHashSetWithExpectedSize(players.size());
-        for(final Player player : players)
+        try
         {
-            Validate.notNull(player, "Cannot create a GameServer for a game that has a null player");
-            /*
-             * Doesn't really matter what port the're on, so just pick one
-             * randomly (but make sure we haven't picked it before)
-             */
-            int port;
-            do
+            for(final Player player : players)
             {
-                port = ThreadLocalRandom.current().nextInt(MAX_PORTS) + 1;
-            }
-            while(usedPorts.add(port));
+                Validate.notNull(player,
+                        "Cannot create a GameServer for a game that has a null player");
+                /*
+                 * Doesn't really matter what port the're on, so just pick one
+                 * randomly (but make sure we haven't picked it before)
+                 */
+                int port;
+                do
+                {
+                    port = ThreadLocalRandom.current().nextInt(MAX_PORTS) + 1;
+                }
+                while(usedPorts.add(port));
 
-            LOG.info("Mapping Player {} to port {}", player, port);
-            final GameListener<A, S, G> listener = new GameListener<A, S, G>(port);
-            playersToListeners_.put(player, listener);
-            final ListenableFuture<Void> waitingConnection = threadPool_
-                    .submit(new Callable<Void>()
-                    {
-                        // Is there a better way to do this? wtf Void
-                        @Override
-                        public Void call() throws Exception
+                LOG.info("Mapping Player {} to port {}", player, port);
+                final GameListener<S, A> listener = new GameListener<S, A>(port, actionClass);
+                playersToListeners_.put(player, listener);
+                final ListenableFuture<Void> waitingConnection = threadPool_
+                        .submit(new Callable<Void>()
                         {
-                            listener.connect();
-                            return null;
-                        }
-                    });
-            attachClientConnectionCallback(waitingConnection);
+                            // Is there a better way to do this? wtf Void
+                            @Override
+                            public Void call() throws Exception
+                            {
+                                listener.connect();
+                                return null;
+                            }
+                        });
+                attachClientConnectionCallback(waitingConnection);
+            }
+        }
+        catch(IOException e)
+        {
+            LOG.error("Encountered unexpected exception while initializing listeners for {}",
+                    players, e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -127,7 +141,6 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
             {
                 final int totalFailures = failedClientConnections_.incrementAndGet();
                 LOG.error("A client failed to connect, {} total failures", totalFailures, exception);
-
             }
 
             @Override
@@ -143,6 +156,8 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
      * Blocks until all clients have successfully connected or throw errors
      * 
      * @throws InterruptedException
+     * 
+     * @return True if all clients have connected succesfully, false otherwise
      */
     public boolean awaitAllClientConnections() throws InterruptedException
     {
@@ -155,6 +170,8 @@ public class GameServer<A extends Action, S extends State<A>, G extends Game<A, 
             }
             Thread.sleep(pollTimeMilliseconds);
         }
+        
+        LOG.info(hasAClientConnectionFailed() ? "A client had a problem connecting" : "All clients connected successfully");
 
         return !(hasAClientConnectionFailed());
     }
