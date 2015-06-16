@@ -11,10 +11,11 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import core.Player;
+import core.Score;
 import utils.SerializationUtils;
 import utils.Vector2;
 
-public class KeySerializationFactory
+public class SerializationFactory
 {
     public static Module newVector2SerializationModule()
     {
@@ -51,8 +52,8 @@ public class KeySerializationFactory
     public static Module newPlayerSerializationModule()
     {
         return new SimpleModule().addKeyDeserializer(Player.class,
-                KeySerializationFactory.newPlayerKeyDeserializer()).addKeySerializer(Player.class,
-                KeySerializationFactory.newPlayerKeySerializer());
+                SerializationFactory.newPlayerKeyDeserializer()).addKeySerializer(Player.class,
+                SerializationFactory.newPlayerKeySerializer());
     }
 
     public static KeyDeserializer newPlayerKeyDeserializer()
@@ -77,6 +78,39 @@ public class KeySerializationFactory
                     final SerializerProvider serializers) throws IOException
             {
                 final String json = SerializationUtils.writeValue(player);
+                generator.writeFieldName(json);
+            }
+        };
+    }
+
+    public static Module newScoreSerializationModule()
+    {
+        return new SimpleModule().addKeyDeserializer(Score.class,
+                SerializationFactory.newScoreKeyDeserializer()).addKeySerializer(Score.class,
+                SerializationFactory.newScoreKeySerializer());
+    }
+
+    public static KeyDeserializer newScoreKeyDeserializer()
+    {
+        return new KeyDeserializer()
+        {
+            @Override
+            public Score deserializeKey(final String jsonKey, final DeserializationContext context)
+            {
+                return SerializationUtils.readValue(jsonKey, Score.class);
+            }
+        };
+    }
+
+    public static JsonSerializer<Score> newScoreKeySerializer()
+    {
+        return new JsonSerializer<Score>()
+        {
+            @Override
+            public void serialize(final Score score, final JsonGenerator generator,
+                    final SerializerProvider serializers) throws IOException
+            {
+                final String json = SerializationUtils.writeValue(score);
                 generator.writeFieldName(json);
             }
         };

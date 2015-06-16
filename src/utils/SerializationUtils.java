@@ -10,7 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import core.utils.KeySerializationFactory;
+import core.utils.SerializationFactory;
 
 /**
  * Helper class to read & write our objects into and out of JSON
@@ -27,8 +27,9 @@ public class SerializationUtils
     private static final ObjectMapper MAPPER = newDefaultMapper();
     static
     {
-        MAPPER.registerModules(KeySerializationFactory.newVector2SerializationModule(),
-                KeySerializationFactory.newPlayerSerializationModule());
+        MAPPER.registerModule(SerializationFactory.newVector2SerializationModule());
+        MAPPER.registerModule(SerializationFactory.newPlayerSerializationModule());
+        MAPPER.registerModule(SerializationFactory.newScoreSerializationModule());
     }
 
     public static ObjectMapper newDefaultMapper()
