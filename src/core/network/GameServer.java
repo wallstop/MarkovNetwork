@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,6 +40,7 @@ public class GameServer<S, A, R extends Rules<S, A>>
 
     private final AtomicInteger succesfulClientConnections_ = new AtomicInteger(0);
     private final AtomicInteger failedClientConnections_ = new AtomicInteger(0);
+    final R rules_;
 
     /**
      * Creates a game server for the specified game
@@ -49,6 +51,7 @@ public class GameServer<S, A, R extends Rules<S, A>>
     public GameServer(final R rules, final Collection<Player> players, final Class<A> actionClass)
     {
         Validate.notNull(rules, "Cannot create a GameServer with a null Ruleset");
+        rules_ = rules;
         final Range<Integer> playerRange = rules.numberOfPlayers();
         Validate.notNull(playerRange, "Cannot create a GameServer for a null player range");
         Validate.notEmpty(players, "Cannot create a GameServer with a null Collection of Players");
@@ -101,9 +104,12 @@ public class GameServer<S, A, R extends Rules<S, A>>
                  * randomly (but make sure we haven't picked it before)
                  */
                 int port;
+                // Offset the ports so we don't overlap with common ones
+                final int portOffset = 100;
                 do
                 {
-                    port = ThreadLocalRandom.current().nextInt(MAX_PORTS) + 1;
+                    port = ThreadLocalRandom.current().nextInt(MAX_PORTS - portOffset) + portOffset
+                            + 1;
                 }
                 while(usedPorts.add(port));
 
@@ -202,4 +208,31 @@ public class GameServer<S, A, R extends Rules<S, A>>
                                 .getPort()));
     }
 
+    public void playUntilCompletion() throws InterruptedException, ExecutionException
+    {
+        Validate.isTrue(areAllClientsConnected(),
+                "Cannot play a game to completion that doesn't have all clients connected!");
+        final S initialState = rules_.generateInitialState(playersToListeners_.keySet());
+        Validate.notNull(initialState, "Cannot play a game with a null initial state");
+        S currentState = initialState;
+        Player currentPlayer;
+        while(!rules_.isTerminal(currentState))
+        {
+            currentPlayer = rules_.getCurrentPlayer(currentState);
+            final GameListener<S, A> listenerForPlayer = playersToListeners_.get(currentPlayer);
+            Validate.notNull(listenerForPlayer, String.format(
+                    "Rules %s reported player %s, but we have no knowledge of it (%s)", rules_,
+                    currentPlayer, playersToListeners_));
+            final Collection<A> availableActions = rules_.getAvailableActions(currentPlayer,
+                    currentState);
+            final A chosenAction = listenerForPlayer.requestChooseAction(currentState);
+            Validate.isTrue(availableActions.contains(chosenAction), String.format(
+                    "Cannot take Action %s, it is not valid. Valid actions: %s", chosenAction,
+                    availableActions));
+            currentState = rules_.transition(currentState, chosenAction);
+        }
+
+        LOG.info("Ending state for game between {}:{}{}",
+                new Object[] { playersToListeners_.keySet(), System.lineSeparator(), currentState });
+    }
 }

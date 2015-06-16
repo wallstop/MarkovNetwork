@@ -10,6 +10,7 @@ import java.net.Socket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import utils.NetworkUtils;
 import utils.SerializationUtils;
 import utils.Validate;
 
@@ -34,7 +35,7 @@ public class GameListener<S, A>
         actionType_ = actionClass;
     }
 
-    public A requestChooseAction(final S gameState)
+    public A requestChooseAction(final S gameState) throws InterruptedException
     {
         Validate.notNull(clientConnection_,
                 "Cannot make transactions with a null client connection");
@@ -46,10 +47,12 @@ public class GameListener<S, A>
     private void writeStateToClient(final S gameState)
     {
         final String stateAsJson = SerializationUtils.writeValue(gameState);
-        try(final DataOutputStream outputStream = new DataOutputStream(
-                clientConnection_.getOutputStream()))
+
+        try
         {
-            outputStream.writeBytes(stateAsJson);
+            final DataOutputStream outputStream = new DataOutputStream(
+                    clientConnection_.getOutputStream());
+            outputStream.writeBytes(stateAsJson + System.lineSeparator());
         }
         catch(IOException e)
         {
@@ -59,11 +62,14 @@ public class GameListener<S, A>
         }
     }
 
-    private A readResponseFromClient()
+    private A readResponseFromClient() throws InterruptedException
     {
-        try(final BufferedReader clientReader = new BufferedReader(new InputStreamReader(
-                clientConnection_.getInputStream())))
+        try
         {
+            final BufferedReader clientReader = new BufferedReader(new InputStreamReader(
+                    clientConnection_.getInputStream()));
+
+            NetworkUtils.awaitBuffer(clientReader);
             final String actionResponse = clientReader.readLine();
             final A action = SerializationUtils.readValue(actionResponse, actionType_);
             return action;
@@ -74,6 +80,7 @@ public class GameListener<S, A>
                     + "attempting to receive an action response from client", e);
             throw new RuntimeException(e);
         }
+
     }
 
     public void connect() throws IOException

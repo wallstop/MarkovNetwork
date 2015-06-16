@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -18,16 +19,17 @@ public class TicTacToeServerTest
 {
 
     public static void main(String args[]) throws InterruptedException, UnknownHostException,
-            IOException
+            IOException, ExecutionException
     {
-        final Map<Player, Policy<TicTacToeState, TicTacToeAction>> policies = new HashMap<>();
-        policies.put(new Player("Player 1"), new RandomPolicy<>());
-        policies.put(new Player("Player 2"), new RandomPolicy<>());
-        final TicTacToeState initialState = new TicTacToeState(policies.keySet());
+        final Map<Player, Policy<TicTacToeState, TicTacToeAction>> playersToPolicies = new HashMap<>();
+        playersToPolicies.put(new Player("Player 1"), new RandomPolicy<>());
+        playersToPolicies.put(new Player("Player 2"), new RandomPolicy<>());
         final TicTacToeRules rules = new TicTacToeRules();
+        final TicTacToeState initialState = null; //new TicTacToeState(policies.keySet());
+        
 
         final GameServer<TicTacToeState, TicTacToeAction, TicTacToeRules> gameServer = new GameServer<>(
-                rules, policies.keySet(), TicTacToeAction.class);
+                rules, playersToPolicies.keySet(), TicTacToeAction.class);
 
         final Map<Player, Integer> playersToPorts = ImmutableMap.<Player, Integer> builder()
                 .putAll(gameServer.getPlayersToPorts()).build();
@@ -38,16 +40,11 @@ public class TicTacToeServerTest
             final Player player = playerToPort.getKey();
             final Integer port = playerToPort.getValue();
             final GameClient<TicTacToeState, TicTacToeAction, TicTacToeRules> client = new GameClient<>(
-                    rules, policies.get(player), port, TicTacToeState.class);
+                    rules, playersToPolicies.get(player), port, TicTacToeState.class);
             playersToClients.put(player, client);
             new Thread(client).start();
         }
         gameServer.awaitAllClientConnections();
-
-        /*
-         * TODO: Actually play game. Maybe this is the time to turn automator
-         * into an interface, have game server implement it?
-         */
-
+        gameServer.playUntilCompletion();
     }
 }

@@ -11,6 +11,7 @@ import java.util.Collection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import utils.NetworkUtils;
 import utils.SerializationUtils;
 import utils.Validate;
 import core.Player;
@@ -42,13 +43,15 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
                 new Object[] { GameClient.class.getSimpleName(), policy, port });
     }
 
-    private S readStateFromServer()
+    private S readStateFromServer() throws InterruptedException
     {
-        try(final BufferedReader clientReader = new BufferedReader(new InputStreamReader(
-                server_.getInputStream())))
+        try
         {
-            final String actionResponse = clientReader.readLine();
-            final S state = SerializationUtils.readValue(actionResponse, stateClass_);
+            final BufferedReader serverReader = new BufferedReader(new InputStreamReader(
+                    server_.getInputStream()));
+            NetworkUtils.awaitBuffer(serverReader);
+            final String stateJson = serverReader.readLine();
+            final S state = SerializationUtils.readValue(stateJson, stateClass_);
             return state;
         }
         catch(IOException e)
@@ -62,9 +65,10 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
     private void writeActionToServer(final A action)
     {
         final String stateAsJson = SerializationUtils.writeValue(action);
-        try(final DataOutputStream outputStream = new DataOutputStream(server_.getOutputStream()))
+        try
         {
-            outputStream.writeBytes(stateAsJson);
+            final DataOutputStream outputStream = new DataOutputStream(server_.getOutputStream());
+            outputStream.writeBytes(stateAsJson + System.lineSeparator());
         }
         catch(IOException e)
         {
@@ -77,18 +81,28 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
     @Override
     public void run()
     {
-
-        while(true)
+        try
         {
-            final S state = readStateFromServer();
-            /*
-             * TODO: See if there's a better way of determining what player we
-             * are...
-             */
-            final Player player = rules_.getCurrentPlayer(state);
-            final Collection<A> actions = rules_.getAvailableActions(player, state);
-            final A chosenAction = policy_.chooseAction(state, actions);
-            writeActionToServer(chosenAction);
+            while(true)
+            {
+                final S state = readStateFromServer();
+
+                /*
+                 * TODO: See if there's a better way of determining what player
+                 * we are...
+                 */
+                final Player player = rules_.getCurrentPlayer(state);
+                LOG.info("Current player: {}", player);
+                final Collection<A> actions = rules_.getAvailableActions(player, state);
+                LOG.info("Available actions: {}", actions);
+                final A chosenAction = policy_.chooseAction(state, actions);
+                LOG.info("Chose action: {}", chosenAction);
+                writeActionToServer(chosenAction);
+            }
+        }
+        catch(Exception e)
+        {
+            LOG.error("Caught unexpected exception while running Client", e);
         }
     }
 }

@@ -7,7 +7,10 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import core.utils.KeySerializationFactory;
 
 /**
  * Helper class to read & write our objects into and out of JSON
@@ -21,12 +24,27 @@ public class SerializationUtils
 {
     private static final Logger LOG = LoggerFactory.getLogger(SerializationUtils.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = newDefaultMapper();
     static
     {
-        MAPPER.setVisibilityChecker(MAPPER.getSerializationConfig().getDefaultVisibilityChecker()
-                .withFieldVisibility(Visibility.ANY).withGetterVisibility(Visibility.NONE)
-                .withSetterVisibility(Visibility.NONE).withCreatorVisibility(Visibility.NONE));
+        MAPPER.registerModules(KeySerializationFactory.newVector2SerializationModule(),
+                KeySerializationFactory.newPlayerSerializationModule());
+    }
+
+    public static ObjectMapper newDefaultMapper()
+    {
+        final ObjectMapper defaultMapper = new ObjectMapper();
+        defaultMapper.setVisibilityChecker(defaultMapper.getSerializationConfig()
+                .getDefaultVisibilityChecker().withFieldVisibility(Visibility.ANY)
+                .withGetterVisibility(Visibility.NONE).withSetterVisibility(Visibility.NONE)
+                .withIsGetterVisibility(Visibility.NONE).withCreatorVisibility(Visibility.NONE));
+        return defaultMapper;
+    }
+
+    public static void registerModules(final Module... modules)
+    {
+        Validate.notNull(modules, "Cannot register a null module!");
+        MAPPER.registerModules(modules);
     }
 
     public static <T> T readValue(final String json, final Class<T> clazz)
