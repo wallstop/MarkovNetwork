@@ -2,6 +2,9 @@ package core.utils;
 
 import java.io.IOException;
 
+import utils.SerializationUtils;
+import utils.Vector2;
+
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonSerializer;
@@ -12,8 +15,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import core.Player;
 import core.Score;
-import utils.SerializationUtils;
-import utils.Vector2;
 
 public class SerializationFactory
 {

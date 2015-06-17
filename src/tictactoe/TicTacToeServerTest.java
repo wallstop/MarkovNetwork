@@ -18,16 +18,13 @@ import core.policies.RandomPolicy;
 public class TicTacToeServerTest
 {
 
-    public static void main(String args[]) throws InterruptedException, UnknownHostException,
+    public static void main(final String args[]) throws InterruptedException, UnknownHostException,
             IOException, ExecutionException
     {
         final Map<Player, Policy<TicTacToeState, TicTacToeAction>> playersToPolicies = new HashMap<>();
         playersToPolicies.put(new Player("Player 1"), new RandomPolicy<>());
         playersToPolicies.put(new Player("Player 2"), new RandomPolicy<>());
         final TicTacToeRules rules = new TicTacToeRules();
-        final TicTacToeState initialState = null; //new TicTacToeState(policies.keySet());
-        
-
         final GameServer<TicTacToeState, TicTacToeAction, TicTacToeRules> gameServer = new GameServer<>(
                 rules, playersToPolicies.keySet(), TicTacToeAction.class);
 

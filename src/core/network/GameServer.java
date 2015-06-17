@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
@@ -14,6 +13,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import utils.Range;
+import utils.Validate;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
@@ -22,12 +24,12 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
-import utils.Range;
-import utils.Validate;
+import core.Automator;
 import core.Player;
+import core.Policy;
 import core.Rules;
 
-public class GameServer<S, A, R extends Rules<S, A>>
+public class GameServer<S, A, R extends Rules<S, A>> implements Automator<S, A, R>
 {
     private static final Logger LOG = LoggerFactory.getLogger(GameServer.class);
 
@@ -44,7 +46,7 @@ public class GameServer<S, A, R extends Rules<S, A>>
 
     /**
      * Creates a game server for the specified game
-     * 
+     *
      * @param game
      * @throws IOException
      */
@@ -72,14 +74,12 @@ public class GameServer<S, A, R extends Rules<S, A>>
         /*
          * Not sure of the best way to properly set up clients & severs
          * currently. In my mind, this would be done by some kind of startup
-         * script, probably not pure java code. DUNNO LOL
-         * 
-         * For now we'll assume that the caller will be doing something like:
-         * GameServer myGameServer = new GameServer(TicTacToe); Map<Player, Int>
-         * playersToPorts = myGameServer.getPlayersToPorts(); ... // run off and
-         * create and initialize clients ... // figure out some way for
-         * GameServer to block until all clients are connected ... // Start game
-         * ??? Profit
+         * script, probably not pure java code. DUNNO LOL For now we'll assume
+         * that the caller will be doing something like: GameServer myGameServer
+         * = new GameServer(TicTacToe); Map<Player, Int> playersToPorts =
+         * myGameServer.getPlayersToPorts(); ... // run off and create and
+         * initialize clients ... // figure out some way for GameServer to block
+         * until all clients are connected ... // Start game ??? Profit
          */
     }
 
@@ -116,21 +116,15 @@ public class GameServer<S, A, R extends Rules<S, A>>
                 LOG.info("Mapping Player {} to port {}", player, port);
                 final GameListener<S, A> listener = new GameListener<S, A>(port, actionClass);
                 playersToListeners_.put(player, listener);
-                final ListenableFuture<Void> waitingConnection = threadPool_
-                        .submit(new Callable<Void>()
-                        {
-                            // Is there a better way to do this? wtf Void
-                            @Override
-                            public Void call() throws Exception
-                            {
-                                listener.connect();
-                                return null;
-                            }
-                        });
+                final ListenableFuture<Void> waitingConnection = threadPool_.submit(() ->
+                {
+                    listener.connect();
+                    return null;
+                });
                 attachClientConnectionCallback(waitingConnection);
             }
         }
-        catch(IOException e)
+        catch(final IOException e)
         {
             LOG.error("Encountered unexpected exception while initializing listeners for {}",
                     players, e);
@@ -143,14 +137,14 @@ public class GameServer<S, A, R extends Rules<S, A>>
         Futures.addCallback(connection, new FutureCallback<Void>()
         {
             @Override
-            public void onFailure(Throwable exception)
+            public void onFailure(final Throwable exception)
             {
                 final int totalFailures = failedClientConnections_.incrementAndGet();
                 LOG.error("A client failed to connect, {} total failures", totalFailures, exception);
             }
 
             @Override
-            public void onSuccess(Void success)
+            public void onSuccess(final Void success)
             {
                 final int totalConnections = succesfulClientConnections_.incrementAndGet();
                 LOG.info("A client connected, {} total connections", totalConnections);
@@ -160,9 +154,8 @@ public class GameServer<S, A, R extends Rules<S, A>>
 
     /**
      * Blocks until all clients have successfully connected or throw errors
-     * 
+     *
      * @throws InterruptedException
-     * 
      * @return True if all clients have connected successfully, false otherwise
      */
     public boolean awaitAllClientConnections() throws InterruptedException
@@ -225,7 +218,8 @@ public class GameServer<S, A, R extends Rules<S, A>>
                     currentPlayer, playersToListeners_));
             final Collection<A> availableActions = rules_.getAvailableActions(currentPlayer,
                     currentState);
-            final A chosenAction = listenerForPlayer.requestChooseAction(currentState);
+            final S filteredState = rules_.filterState(currentState, currentPlayer);
+            final A chosenAction = listenerForPlayer.requestChooseAction(filteredState);
             Validate.isTrue(availableActions.contains(chosenAction), String.format(
                     "Cannot take Action %s, it is not valid. Valid actions: %s", chosenAction,
                     availableActions));
@@ -234,5 +228,29 @@ public class GameServer<S, A, R extends Rules<S, A>>
 
         LOG.info("Ending state for game between {}:{}{}",
                 new Object[] { playersToListeners_.keySet(), System.lineSeparator(), currentState });
+    }
+
+    @Override
+    public S playGameToCompletion(final R rules, final S initialState,
+            final Map<Player, Policy<S, A>> policies)
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public S advanceUntilPlayerTurn(final R rules, final S initialState, final Player player,
+            final Map<Player, Policy<S, A>> policies)
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public S advanceSingleAction(final R rules, final S initialState,
+            final Map<Player, Policy<S, A>> policies)
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }
