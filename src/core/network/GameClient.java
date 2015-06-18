@@ -5,7 +5,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.Collection;
 
 import org.slf4j.Logger;
@@ -28,7 +27,7 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
     private final R rules_;
 
     public GameClient(final R rules, final Policy<S, A> policy, final int port,
-            final Class<S> stateClass) throws UnknownHostException, IOException
+            final Class<S> stateClass)
     {
         Validate.notNull(rules, "Cannot create a GameClient from a null rule set");
         Validate.notNull(policy, "Cannot create a GameClient from a null policy");
@@ -36,11 +35,19 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
         policy_ = policy;
         rules_ = rules;
         // TODO: Make ip address come into play
-        server_ = new Socket("localhost", port);
-        stateClass_ = stateClass;
+        try
+        {
+            server_ = new Socket("localhost", port);
+        }
+        catch(final IOException e)
+        {
+            LOG.error("Could not create a server socket on {}", port, e);
+            throw new RuntimeException(e);
+        }
 
-        LOG.info("Started {} client with {} policy on port {}",
-                new Object[] { GameClient.class.getSimpleName(), policy, port });
+        stateClass_ = stateClass;
+        LOG.info("Started {} client with {} policy on port {}", GameClient.class.getSimpleName(),
+                policy, port);
     }
 
     private S readStateFromServer() throws InterruptedException
@@ -54,7 +61,7 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
             final S state = SerializationUtils.readValue(stateJson, stateClass_);
             return state;
         }
-        catch(IOException e)
+        catch(final IOException e)
         {
             LOG.error("Encountered unexpected exception while "
                     + "attempting to receive a state from the server", e);
@@ -70,7 +77,7 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
             final DataOutputStream outputStream = new DataOutputStream(server_.getOutputStream());
             outputStream.writeBytes(stateAsJson + System.lineSeparator());
         }
-        catch(IOException e)
+        catch(final IOException e)
         {
             LOG.error("Encountered unexpected exception while writing {} out to the server",
                     stateAsJson, e);
@@ -83,6 +90,10 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
     {
         try
         {
+            /*
+             * TODO: Figure out some kind of signal/event driven architecture so
+             * we can shutdown our threads cleanly
+             */
             while(true)
             {
                 final S state = readStateFromServer();
@@ -100,7 +111,7 @@ public class GameClient<S, A, R extends Rules<S, A>> implements Runnable
                 writeActionToServer(chosenAction);
             }
         }
-        catch(Exception e)
+        catch(final Exception e)
         {
             LOG.error("Caught unexpected exception while running Client", e);
         }

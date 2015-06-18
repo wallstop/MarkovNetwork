@@ -60,7 +60,7 @@ public final class SerializationUtils
     public static void registerModules(final Module... modules)
     {
         Validate.notNull(modules, "Cannot register a null module!");
-        LOG.info("Registering modules {}", modules);
+        LOG.info("Registering modules {}", (Object[]) modules);
         MAPPER.registerModules(modules);
     }
 
@@ -77,7 +77,7 @@ public final class SerializationUtils
         }
         catch(final IOException e)
         {
-            LOG.error("Could not convert {} into {}", new Object[] { json, clazz }, e);
+            LOG.error("Could not convert {} into {}", json, clazz, e);
             throw new IllegalArgumentException(e);
         }
     }

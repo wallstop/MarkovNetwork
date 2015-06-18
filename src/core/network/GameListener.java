@@ -35,7 +35,7 @@ public class GameListener<S, A>
         actionType_ = actionClass;
     }
 
-    public A requestChooseAction(final S gameState) throws InterruptedException
+    public A requestChooseAction(final S gameState)
     {
         Validate.notNull(clientConnection_,
                 "Cannot make transactions with a null client connection");
@@ -54,7 +54,7 @@ public class GameListener<S, A>
                     clientConnection_.getOutputStream());
             outputStream.writeBytes(stateAsJson + System.lineSeparator());
         }
-        catch(IOException e)
+        catch(final IOException e)
         {
             LOG.error("Encountered unexpected exception while writing {} out to the client",
                     stateAsJson, e);
@@ -62,7 +62,7 @@ public class GameListener<S, A>
         }
     }
 
-    private A readResponseFromClient() throws InterruptedException
+    private A readResponseFromClient()
     {
         try
         {
@@ -74,7 +74,7 @@ public class GameListener<S, A>
             final A action = SerializationUtils.readValue(actionResponse, actionType_);
             return action;
         }
-        catch(IOException e)
+        catch(final IOException e)
         {
             LOG.error("Encountered unexpected exception while "
                     + "attempting to receive an action response from client", e);
@@ -83,7 +83,7 @@ public class GameListener<S, A>
 
     }
 
-    public void connect() throws IOException
+    public void connect()
     {
         try
         {
@@ -94,14 +94,58 @@ public class GameListener<S, A>
                         + "{}, but accept() returned null", serverSocket_.getLocalPort());
                 throw new RuntimeException("Could not establish client connection");
             }
+            LOG.info("Successfully established connection on {}:{}",
+                    serverSocket_.getInetAddress(), serverSocket_.getLocalPort());
             clientConnection_ = socket;
         }
-        catch(IOException e)
+        catch(final IOException e)
         {
             LOG.error("Caught unexpeced exception while listening on port {}",
                     serverSocket_.getLocalPort(), e);
-            throw e;
+            throw new RuntimeException(e);
         }
+    }
+
+    public void disconnect()
+    {
+        disconnectClient();
+        disconnectServer();
+    }
+
+    private void disconnectClient()
+    {
+        if(clientConnection_ != null)
+        {
+            try
+            {
+                clientConnection_.close();
+                clientConnection_ = null;
+                LOG.info("Client connection disconnected");
+            }
+            catch(final Exception e)
+            {
+                LOG.error("Caught unexpected exception while "
+                        + "closing client connection, swallowing", e);
+            }
+        }
+        else
+        {
+            LOG.info("Disconnect called on an already disconnectd clientConnection");
+        }
+    }
+
+    private void disconnectServer()
+    {
+        try
+        {
+            serverSocket_.close();
+        }
+        catch(final Exception e)
+        {
+            LOG.error("Caught unexpected exception while "
+                    + "closign server connection, swallowing", e);
+        }
+        LOG.info("Server socket disconnected");
     }
 
     public int getPort()
